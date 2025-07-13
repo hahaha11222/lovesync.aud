@@ -73,51 +73,49 @@
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
     document.getElementById("roomLabel").textContent = "Room: " + room;
-
     const roomRef = firebase.database().ref("rooms/" + room);
 
-    document.getElementById("searchInput").addEventListener("keyup", function(e) {
+    document.getElementById("searchInput").addEventListener("keyup", function (e) {
       if (e.key === "Enter") {
         searchYouTube(this.value);
       }
     });
 
     function searchYouTube(query) {
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "🔍 Searching...";
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "🔍 Searching...";
 
-  fetch(`https://api-yt-search.vercel.app/search?q=${encodeURIComponent(query)}`)
-    .then(res => res.json())
-    .then(data => {
-      resultsDiv.innerHTML = "";
-      if (!data.videos || data.videos.length === 0) {
-        resultsDiv.innerHTML = "❌ No results found.";
-        return;
-      }
+      fetch(`https://ytsearch-api.vercel.app/api/search?q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+          resultsDiv.innerHTML = "";
+          if (!data || !data.videos || data.videos.length === 0) {
+            resultsDiv.innerHTML = "❌ No results found.";
+            return;
+          }
 
-      data.videos.slice(0, 5).forEach(video => {
-        const id = video.videoId;
-        const title = video.title;
-        const thumb = video.thumbnail;
+          data.videos.slice(0, 5).forEach(video => {
+            const id = video.id;
+            const title = video.title;
+            const thumb = video.thumbnail;
 
-        const div = document.createElement("div");
-        div.className = "result";
-        div.innerHTML = `
-          <div class="title">${title}</div>
-          <img src="${thumb}" class="thumb"/>
-        `;
-        div.onclick = () => {
-          roomRef.update({ videoId: id, state: "paused" });
-          window.location.href = `player.html?room=${room}`;
-        };
-        resultsDiv.appendChild(div);
-      });
-    })
-    .catch(() => {
-      resultsDiv.innerHTML = "⚠️ Error searching. Try again later.";
-    });
-}
-    
+            const div = document.createElement("div");
+            div.className = "result";
+            div.innerHTML = `
+              <div class="title">${title}</div>
+              <img src="${thumb}" class="thumb"/>
+            `;
+            div.onclick = () => {
+              roomRef.update({ videoId: id, state: "paused" });
+              window.location.href = `player.html?room=${room}`;
+            };
+            resultsDiv.appendChild(div);
+          });
+        })
+        .catch(() => {
+          resultsDiv.innerHTML = "⚠️ Error searching. Try again later.";
+        });
+    }
   </script>
 </body>
 </html>
