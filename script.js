@@ -4,5 +4,5 @@ function joinRoom() {
     alert("Please enter a room name.");
     return;
   }
-  window.location.href = `player.html?room=${encodeURIComponent(room)}`;
+  window.location.href = `search.html?room=${encodeURIComponent(room)}`;
 }
