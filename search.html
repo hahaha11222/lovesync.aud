@@ -83,41 +83,41 @@
     });
 
     function searchYouTube(query) {
-      const resultsDiv = document.getElementById("results");
-      resultsDiv.innerHTML = "🔍 Searching...";
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "🔍 Searching...";
 
-      fetch(`https://noembed.com/embed?url=https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
-        .then(() => fetch(`https://yt.lemnoslife.com/search?query=${encodeURIComponent(query)}&type=video`)) // workaround for cors-free API
-        .then(res => res.json())
-        .then(data => {
-          resultsDiv.innerHTML = "";
-          if (!data.items || data.items.length === 0) {
-            resultsDiv.innerHTML = "❌ No results found.";
-            return;
-          }
+  fetch(`https://api-yt-search.vercel.app/search?q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+      resultsDiv.innerHTML = "";
+      if (!data.videos || data.videos.length === 0) {
+        resultsDiv.innerHTML = "❌ No results found.";
+        return;
+      }
 
-          data.items.slice(0, 5).forEach(item => {
-            const id = item.id.videoId;
-            const title = item.title;
-            const thumb = item.thumbnail;
+      data.videos.slice(0, 5).forEach(video => {
+        const id = video.videoId;
+        const title = video.title;
+        const thumb = video.thumbnail;
 
-            const div = document.createElement("div");
-            div.className = "result";
-            div.innerHTML = `
-              <div class="title">${title}</div>
-              <img src="${thumb}" class="thumb"/>
-            `;
-            div.onclick = () => {
-              roomRef.update({ videoId: id, state: "paused" });
-              window.location.href = `player.html?room=${room}`;
-            };
-            resultsDiv.appendChild(div);
-          });
-        })
-        .catch(() => {
-          resultsDiv.innerHTML = "⚠️ Error searching. Try again.";
-        });
-    }
+        const div = document.createElement("div");
+        div.className = "result";
+        div.innerHTML = `
+          <div class="title">${title}</div>
+          <img src="${thumb}" class="thumb"/>
+        `;
+        div.onclick = () => {
+          roomRef.update({ videoId: id, state: "paused" });
+          window.location.href = `player.html?room=${room}`;
+        };
+        resultsDiv.appendChild(div);
+      });
+    })
+    .catch(() => {
+      resultsDiv.innerHTML = "⚠️ Error searching. Try again later.";
+    });
+}
+    
   </script>
 </body>
 </html>
