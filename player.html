@@ -6,44 +6,86 @@
   <title>LoveSync Player</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    #player {
-      display: none; /* hides video, only audio plays */
+    body {
+      background: linear-gradient(to bottom, #ffe0ec, #ffffff);
+      font-family: 'Segoe UI', sans-serif;
     }
-    .status {
-      font-size: 0.9rem;
-      color: #888;
+    .container {
+      max-width: 400px;
+      margin: 3rem auto;
+      text-align: center;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+    }
+    input[type="text"] {
+      padding: 0.7rem;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 1rem;
+    }
+    button {
+      background-color: #ff80aa;
+      color: white;
+      border: none;
+      padding: 0.7rem 1.4rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #e86699;
+    }
+    .status, .room, .title {
       margin-top: 1rem;
+      color: #555;
+      font-size: 0.95rem;
     }
+    #player { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>LoveSync 🎶</h1>
-    <p class="subtitle" id="roomLabel"></p>
+    <h2>🎧 LoveSync Player</h2>
+    <p class="room" id="roomLabel"></p>
 
     <input type="text" id="youtubeLink" placeholder="Paste YouTube link..." />
-    <button onclick="loadVideo()">Load & Sync 🎧</button>
+    <button onclick="loadVideo()">Load & Sync 🎶</button>
 
-    <div id="player"></div>
+    <div class="title" id="videoTitle"></div>
 
-    <div class="controls">
+    <div style="margin-top: 1rem;">
       <button onclick="togglePlay()">▶️ / ⏸️</button>
     </div>
 
-    <p class="status" id="status">⏳ Waiting...</p>
+    <div class="status" id="status">Waiting for action...</div>
+
+    <div id="player"></div>
   </div>
 
+  <!-- Firebase + YouTube -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="firebase.js"></script>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const room = urlParams.get("room");
     document.getElementById("roomLabel").textContent = "Room: " + room;
 
+    const roomRef = firebase.database().ref("rooms/" + room);
     let player;
-    let isHost = false; // First person to load the video becomes host
+    let isHost = false;
+    let currentVideoId = "";
 
-    // YouTube iframe API
+    function extractYouTubeID(url) {
+      const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+      return match ? match[1] : null;
+    }
+
     function onYouTubeIframeAPIReady() {
       player = new YT.Player("player", {
         height: "0",
@@ -51,8 +93,17 @@
         videoId: "",
         playerVars: { playsinline: 1 },
         events: {
-          onReady: () => console.log("Player ready"),
-          onStateChange: onPlayerStateChange
+          onReady: () => {
+            console.log("Player ready");
+          },
+          onStateChange: (event) => {
+            if (!isHost) return;
+            if (event.data === YT.PlayerState.PLAYING) {
+              firebaseSet("state", "playing");
+            } else if (event.data === YT.PlayerState.PAUSED) {
+              firebaseSet("state", "paused");
+            }
+          }
         }
       });
     }
@@ -61,9 +112,14 @@
       const url = document.getElementById("youtubeLink").value;
       const videoId = extractYouTubeID(url);
       if (!videoId) return alert("Invalid YouTube link.");
+      currentVideoId = videoId;
       isHost = true;
+
       player.loadVideoById(videoId);
       firebaseSet("videoId", videoId);
+      firebaseSet("state", "paused");
+
+      getVideoTitle(videoId);
     }
 
     function togglePlay() {
@@ -77,42 +133,38 @@
       }
     }
 
-    function onPlayerStateChange(event) {
-      if (!isHost) return;
-      if (event.data === YT.PlayerState.PAUSED) {
-        firebaseSet("state", "paused");
-      } else if (event.data === YT.PlayerState.PLAYING) {
-        firebaseSet("state", "playing");
-      }
+    function firebaseSet(key, value) {
+      roomRef.update({ [key]: value });
     }
-
-    function extractYouTubeID(url) {
-      const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
-      return match ? match[1] : null;
-    }
-
-    // Firebase sync
-    const db = firebase.database();
-    const roomRef = db.ref("rooms/" + room);
 
     roomRef.on("value", (snap) => {
       const data = snap.val();
       if (!data) return;
 
-      document.getElementById("status").textContent = `🎧 Synced | Video: ${data.videoId}`;
+      document.getElementById("status").textContent = "🎵 Synced | " + (data.state || "waiting...");
 
-      if (!isHost && data.videoId) {
+      if (!isHost && data.videoId && data.videoId !== currentVideoId) {
+        currentVideoId = data.videoId;
         player.loadVideoById(data.videoId);
+        getVideoTitle(data.videoId);
       }
 
       if (!isHost && data.state) {
         if (data.state === "paused") player.pauseVideo();
-        if (data.state === "playing") player.playVideo();
+        if (data.state === "playing") {
+          player.mute(); // Required on mobile for autoplay
+          player.playVideo();
+          setTimeout(() => player.unMute(), 500); // Unmute after short delay
+        }
       }
     });
 
-    function firebaseSet(key, value) {
-      roomRef.update({ [key]: value });
+    function getVideoTitle(videoId) {
+      fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("videoTitle").textContent = "🎶 " + data.title;
+        });
     }
   </script>
 </body>
