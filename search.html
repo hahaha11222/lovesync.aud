@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search Song - LoveSync</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      background: linear-gradient(to bottom, #ffe0ec, #ffffff);
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .container {
+      max-width: 450px;
+      margin: 3rem auto;
+      text-align: center;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+    }
+    input {
+      padding: 0.7rem;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    .result {
+      text-align: left;
+      background: #fef1f5;
+      margin-top: 0.5rem;
+      padding: 0.8rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .result:hover {
+      background: #ffe4ee;
+    }
+    .title {
+      font-weight: bold;
+      margin-bottom: 0.2rem;
+    }
+    .thumb {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-top: 0.4rem;
+    }
+    .note {
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎵 Search for a Song</h2>
+    <p id="roomLabel" class="note"></p>
+    <input type="text" id="searchInput" placeholder="e.g. Cigarettes After Sex" />
+    <div id="results"></div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script src="firebase.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room");
+    document.getElementById("roomLabel").textContent = "Room: " + room;
+
+    const roomRef = firebase.database().ref("rooms/" + room);
+
+    document.getElementById("searchInput").addEventListener("keyup", function(e) {
+      if (e.key === "Enter") {
+        searchYouTube(this.value);
+      }
+    });
+
+    function searchYouTube(query) {
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "🔍 Searching...";
+
+      fetch(`https://noembed.com/embed?url=https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`)
+        .then(() => fetch(`https://yt.lemnoslife.com/search?query=${encodeURIComponent(query)}&type=video`)) // workaround for cors-free API
+        .then(res => res.json())
+        .then(data => {
+          resultsDiv.innerHTML = "";
+          if (!data.items || data.items.length === 0) {
+            resultsDiv.innerHTML = "❌ No results found.";
+            return;
+          }
+
+          data.items.slice(0, 5).forEach(item => {
+            const id = item.id.videoId;
+            const title = item.title;
+            const thumb = item.thumbnail;
+
+            const div = document.createElement("div");
+            div.className = "result";
+            div.innerHTML = `
+              <div class="title">${title}</div>
+              <img src="${thumb}" class="thumb"/>
+            `;
+            div.onclick = () => {
+              roomRef.update({ videoId: id, state: "paused" });
+              window.location.href = `player.html?room=${room}`;
+            };
+            resultsDiv.appendChild(div);
+          });
+        })
+        .catch(() => {
+          resultsDiv.innerHTML = "⚠️ Error searching. Try again.";
+        });
+    }
+  </script>
+</body>
+</html>
